@@ -20,13 +20,6 @@ jobs:
           python-version: "3.13"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - name: Install Node dependencies
-        run: npm ci
       - name: Setup Python environment
         run: |
           uv sync
@@ -46,7 +39,11 @@ jobs:
         id: dd_plan
         run: |
           rm -rf .testoptimization
-          bin/ddtest plan --platform python --framework pytest --min-parallelism 1 --max-parallelism 4
+          bin/ddtest plan --platform python --framework pytest \
+            --command 'uv run pytest' \
+            --tests-location 'bookmarks/tests/**/{tests.py,test_*.py,*_tests.py}' \
+            --force-full-test-discovery --strict-discovery \
+            --min-parallelism 1 --max-parallelism 4
       - name: Upload test plan
         uses: actions/upload-artifact@v4
         with:
@@ -69,13 +66,6 @@ jobs:
           python-version: "3.13"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - name: Install Node dependencies
-        run: npm ci
       - name: Setup Python environment
         run: |
           uv sync
@@ -99,7 +89,9 @@ jobs:
       - name: Run tests
         run: |
           test -f .testoptimization/manifest.txt
-          bin/ddtest run --platform python --framework pytest --ci-node ${{ matrix.ci_node_index }}
+          bin/ddtest run --platform python --framework pytest \
+            --command 'uv run pytest' \
+            --ci-node ${{ matrix.ci_node_index }}
   e2e_test_plan:
     name: E2E Tests / Plan
     runs-on: ubuntu-latest
@@ -113,22 +105,10 @@ jobs:
           python-version: "3.13"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - name: Install Node dependencies
-        run: npm ci
       - name: Setup Python environment
         run: |
           uv sync
-          uv run playwright install chromium
           mkdir data
-      - name: Run build
-        run: |
-          npm run build
-          uv run manage.py collectstatic
       - name: Install Datadog Test Parallelization
         run: |
           mkdir -p bin
@@ -142,11 +122,13 @@ jobs:
           site: datadoghq.com
       - name: Plan tests
         id: dd_plan
-        env:
-          PYTEST_ADDOPTS: '-o "python_files=e2e_test_*.py"'
         run: |
           rm -rf .testoptimization
-          bin/ddtest plan bookmarks/tests_e2e --platform python --framework pytest --min-parallelism 1 --max-parallelism 4
+          bin/ddtest plan --platform python --framework pytest \
+            --command 'uv run pytest -o python_files=e2e_test_*.py' \
+            --tests-location 'bookmarks/tests_e2e/**/e2e_test_*.py' \
+            --force-full-test-discovery --strict-discovery \
+            --min-parallelism 1 --max-parallelism 4
       - name: Upload test plan
         uses: actions/upload-artifact@v4
         with:
@@ -202,11 +184,11 @@ jobs:
           api_key: ${{ secrets.DD_API_KEY }}
           site: datadoghq.com
       - name: Run tests
-        env:
-          PYTEST_ADDOPTS: '-o "python_files=e2e_test_*.py"'
         run: |
           test -f .testoptimization/manifest.txt
-          bin/ddtest run --platform python --framework pytest --ci-node ${{ matrix.ci_node_index }}
+          bin/ddtest run --platform python --framework pytest \
+            --command 'uv run pytest -o python_files=e2e_test_*.py' \
+            --ci-node ${{ matrix.ci_node_index }}
       - name: Upload screenshots
         if: failure()
         uses: actions/upload-artifact@v4
